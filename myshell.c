@@ -43,6 +43,93 @@ int num_commands(char *cmd, char *c) {
 }
 
 /* 
+ * ATTEMPT AT PIPES
+ * Takes in a series of commands with pipes, separates them into individual
+ * segments, then splits them by spaces to implement piping
+ */
+
+// void execute_pipes(char *cmd, int num_pipes) {
+
+// 	char* cmd_copy = malloc(strlen(cmd) + 1);
+// 	printf("%s\n", cmd_copy);
+// 	// create list of pointers that point to list of arguments for each command
+// 	int cmd_size = num_pipes + 1;
+// 	char **pipe_cmds[cmd_size]; // create array of commands separated by pipes
+	
+// 	char *cmd_token = strtok(cmd_copy, "|"); // start with first command
+// 	int i = 0;
+// 	while(cmd_token) {
+// ;
+// 		int j = 0;
+// 		char* arg_array[num_commands(cmd_token, " ") + 1]; // create array of tokens from the arguments from the commands
+// 		char* cmd_token_copy = malloc(strlen(cmd_token) + 1);
+// 		strcpy(cmd_token_copy, cmd_token);
+// 		char* arg_token = strtok(cmd_token_copy, " "); // start with first argument
+// 		while(arg_token) {
+
+// 			arg_array[j] = arg_token; // add current arg to array
+// 			j++;
+// 			arg_token = strtok(NULL, " "); // move to next
+
+// 		}
+
+// 		arg_array[j] = (char *)0; // set last argument array element to NULL
+
+// 		pipe_cmds[i] = arg_array; // add current argument array to command array
+// 		i++;
+// 		cmd_token = strtok(NULL, "|"); // move to next command after next pipe
+// 		printf("%s\n", cmd_copy);
+// 	}
+
+// 	pipe_cmds[i] = NULL;
+
+// 	printf("%s\n", (*pipe_cmds)[0]);
+// 	printf("%s\n", (*pipe_cmds)[1]);
+
+// 	// create and implement pipes
+// 	for (i = 0; i < cmd_size - 1; i++) {
+
+// 		int pipefd[2];
+// 		pid_t pid;
+// 		int status;
+// 		int oldfd = 0;
+
+// 		if (pipe_cmds[i + 1] != NULL) {
+// 			pipe(pipefd); // create 2 pipes, each with a file descriptor
+// 		}
+// 		pid = fork();
+
+// 		if (pid < 0) {
+// 			printf("ERROR: cannot fork\n");
+// 		}
+
+// 		else if (pid == 0) {
+
+// 			dup2(oldfd, 0); // get input from last command
+// 			if (pipe_cmds[i + 1] != NULL) {
+// 				dup2(pipefd[1], 1); // send input to next command
+// 			}
+// 			close(pipefd[0]);
+// 			close(pipefd[1]);
+// 			execvp(pipe_cmds[i][0], pipe_cmds[i]);
+// 			printf("ERROR NUMBER %d\n", errno);
+// 			exit(errno);
+
+// 		}
+
+// 		else {
+
+// 			while ((pid != wait(&status)));
+// 			oldfd = pipefd[0]; // prepare input for next command
+// 			close(pipefd[1]);
+
+// 		}
+
+// 	}
+
+// }
+
+/* 
  * Executes simple commands
  */
 void execute_simple(char *argv[], char *file, int crt_in, int crt_out, char car_arg, int amp) {
@@ -155,12 +242,10 @@ void main(int argc, char *argv) {
 			}
 
 			if ((strchr(sem_tks[j], '&')  != NULL) && (strchr(sem_tks[j], '>') == NULL)){
-				printf("Recognized &\n");
 				amp = 1;
 				strcpy(c,"&");
 				sem_tks[j] = strtok(sem_tks[j], "&");
 			}
-			printf("%s\n", sem_tks[j]);
 
 
 			//printf("%d\n", carat_out);
@@ -204,6 +289,14 @@ void main(int argc, char *argv) {
 				token = strtok(sem_tks[j], " \n");
 			}
 
+			// PIPE ATTEMPT
+			// // check if pipes exist, and if they do, execute pipe function
+			// pipe_num = num_pipe_cmd(token_space);
+			// if (pipe_num > 1) {
+			// 	char* token_pipe = malloc(strlen(sem_tks[j]));
+			// 	strcpy(token_pipe, sem_tks[j]);
+			// 	execute_pipes(token_pipe, pipe_num);
+			// }
 
 			char *tks[size];
 
