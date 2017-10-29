@@ -1,5 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include<stdio.h>
+#include<signal.h>
+#include<unistd.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -8,11 +11,21 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+pid_t pid;
+
+void sig_handler(int signo)
+{
+  if (signo == SIGINT)
+    kill(pid, SIGINT);
+}
+
 /* 
  * Takes command in shell as input, returns list of args separated by space
  */
 int num_commands(char *cmd, char *c) {
-
+		if (cmd == NULL)
+			exit(0);
+		// printf("%s\n", cmd);
 		char *cmd_copy = malloc(strlen(cmd));
 		strcpy(cmd_copy, cmd);
 
@@ -32,11 +45,10 @@ int num_commands(char *cmd, char *c) {
 /* 
  * Executes simple commands
  */
+void execute_simple(char *argv[], char *file, int crt_in, int crt_out, char car_arg, int amp) {
 
-void execute_simple(char *argv[], char *file) {
-
+	// printf("%d\n", amp);
 	// create child by running fork()
-	pid_t pid;
 	int status;
 	FILE *fp;
 
@@ -49,8 +61,28 @@ void execute_simple(char *argv[], char *file) {
 	else if (pid == 0) { // child process
 		if (file != NULL)
 		{
-			fp = fopen(file, "w");
-			dup2(fileno(fp), STDOUT_FILENO);
+			
+			if (crt_out == 1 || (crt_out == 1 && car_arg == '1')){
+				fp = fopen(file, "w");
+				dup2(fileno(fp), STDOUT_FILENO);
+			}
+
+			if (crt_out == 1 && car_arg == '2'){
+				fp = fopen(file, "w");
+				dup2(fileno(fp), STDERR_FILENO);
+			}
+
+			if (crt_out == 1 && car_arg == '&'){
+				fp = fopen(file, "w");
+				dup2(fileno(fp), STDOUT_FILENO);
+				dup2(fileno(fp), STDERR_FILENO);
+			}
+
+			if (crt_in == 1){
+				fp = fopen(file, "r");
+				dup2(fileno(fp), STDIN_FILENO);
+			}
+
 		}
 		execvp(argv[0], argv);
 		fclose(fp);
@@ -59,19 +91,29 @@ void execute_simple(char *argv[], char *file) {
 	}
 
 	else { // parent process
-		while ((pid != wait(&status)));
+		if (amp == 0){
+			waitpid(pid, &status, 0);
+			//while ((pid != wait(&status)));	
+		}
 	}	
 }
 
-int main(int argc, char *argv) {
+void main(int argc, char *argv) {
 
-	char *FILE = NULL;
-	int carat_out = 0;
+	struct sigaction sigact;
+	sigact.sa_handler = sig_handler;
+	sigaction(SIGINT, &sigact, NULL);
 
 	while (1) {
-		char *cmd = readline("myshell> "); // read from command line
-		
+		int amp = 0;
+		char *FILE = NULL;
+		int carat_out = 0;
+		int carat_in = 0;
+		char car_arg = '0';
 
+		char *cmd = readline("myshell> "); // read from command line
+
+		// printf("h\n");
 		int sem_args = num_commands(cmd, ";"); // number of items separated by ;
 		int args; // number of args for cmd separated by space
 		int i;
@@ -81,24 +123,6 @@ int main(int argc, char *argv) {
 		strcpy(cmd_copy, cmd);
 
 		char *sem_tks[sem_args]; // create array of commands separated by ;
-
-		// //split by semicolons 
-		// halves = strtok(cmd_copy, ">");
-		// char *commd = malloc(strlen(cmd));
-		// strcpy(commd, halves);
-		// printf("command: %s\n", commd);
-
-		// halves = strtok(NULL, ">");
-		// FILE = malloc(strlen(cmd_copy));
-		// strcpy(FILE, halves);
-		// FILE = strtok(FILE, " ");
-		// printf("file:%s\n", FILE);
-
-		// char *token_semi;
-
-		// if (FILE != NULL){
-		// 	token_semi = commd;	
-		// }
 
 		char *token_semi = strtok(cmd_copy, ";");
 
@@ -114,35 +138,63 @@ int main(int argc, char *argv) {
 
 		for (j = 0; j < sem_args; j++) { // iterate through every command separated by ;
 
-			char *token_space = malloc(strlen(sem_tks[j])); // create copy of current command args
+			char *token_space = malloc(strlen(sem_tks[j])+1); // create copy of current command args
 			strcpy(token_space, sem_tks[j]);
+			token_space[strlen(token_space)] = '\0';
 			char *commd;
+			char *c = malloc(3);
 
 			if (strchr(sem_tks[j], '>')){
 				carat_out = 1;
+				strcpy(c, ">");
 			}
 
-			printf("%d\n", carat_out);
-			if (carat_out) {
-				char *carat_cmd;
+			if (strchr(sem_tks[j], '<')){
+				carat_in = 1;
+				strcpy(c,"<");
+			}
 
+			if ((strchr(sem_tks[j], '&')  != NULL) && (strchr(sem_tks[j], '>') == NULL)){
+				printf("Recognized &\n");
+				amp = 1;
+				strcpy(c,"&");
+				sem_tks[j] = strtok(sem_tks[j], "&");
+			}
+			printf("%s\n", sem_tks[j]);
+
+
+			//printf("%d\n", carat_out);
+			if (carat_out || carat_in) {
+				char *carat_cmd;
 				//split by semicolons 
-				carat_cmd = strtok(token_space, ">"); // get first command before >
+				carat_cmd = strtok(token_space, c); // get first command before >
 				commd = malloc(strlen(carat_cmd));
 				strcpy(commd, carat_cmd);
-				printf("command: %s\n", commd);
+				if (strstr(commd, " 1")){
+					car_arg = '1';
+				}
+				if (strstr(commd, " 2")){
+					car_arg = '2';
+				}
+				if (strstr(commd, " &")){
+					car_arg = '&';
+				}
 
-				carat_cmd = strtok(NULL, ">"); // get file
-				FILE = malloc(strlen(carat_cmd));
+				carat_cmd = strtok(NULL, c); // get file
+				FILE = malloc(strlen(carat_cmd)+1);
 				strcpy(FILE, carat_cmd);
 				FILE = strtok(FILE, " ");
-				printf("file:%s\n", FILE);
+				FILE[strlen(FILE)] = '\0';
+
+				if (car_arg != '0'){
+					commd[strlen(commd)-1] = 0;
+				}
 
 			}
 
 			int size;
 			char *token;
-			if (carat_out) {
+			if (carat_out || carat_in) {
 				size = num_commands(commd, " ") + 1;// create array of tokens separate by space, with last space allotted to NULL
 				token = strtok(commd, " \n");
 			}
@@ -152,11 +204,12 @@ int main(int argc, char *argv) {
 				token = strtok(sem_tks[j], " \n");
 			}
 
+
 			char *tks[size];
 
 			i = 0;
 			while(token) { 
-				printf("token: %s\n", token);
+				//printf("token: %s\n", token);
 				tks[i] = token; // add current arg string to array
 				i++;
 				token = strtok(NULL, " ");
@@ -164,10 +217,9 @@ int main(int argc, char *argv) {
 			tks[i] = (char *)0;
 
 			// create child process and run simple commands
-			execute_simple(tks, FILE);
+			execute_simple(tks, FILE, carat_in, carat_out, car_arg, amp);
 		}
 		
 
-		return 0;
 	}
 }
